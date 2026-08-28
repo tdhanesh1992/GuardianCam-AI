@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuardianCam AI - Intelligent Child Safety & Monitoring System</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CSS Style -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Top Navbar -->
+        <header class="navbar">
+            <div class="logo-group">
+                <div class="brand-icon"><i data-lucide="shield-alert"></i></div>
+                <div class="brand-text">
+                    <h1>GuardianCam <span class="badge-ai">AI VISION</span></h1>
+                    <p>Real-Time Child Safety & Danger Alert System</p>
+                </div>
+            </div>
+
+            <div class="nav-controls">
+                <div id="statusPill" class="status-pill safe">
+                    <span class="status-dot"></span>
+                    <span id="statusText">SYSTEM SAFE</span>
+                </div>
+                <button id="soundToggleBtn" class="btn btn-icon btn-glass" title="Toggle Alarm Sound">
+                    <i data-lucide="volume-2"></i> Sound ON
+                </button>
+                <div class="live-clock" id="liveClock">00:00:00</div>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid -->
+        <main class="dashboard-grid">
+            <!-- Left Column: Live Stream & Controls -->
+            <section class="stream-card glass-panel">
+                <div class="panel-header">
+                    <div class="header-title">
+                        <i data-lucide="video"></i>
+                        <h2>Live Video Processing Feed</h2>
+                    </div>
+                    <div class="fps-tag">FPS: <span id="fpsVal">0.0</span></div>
+                </div>
+
+                <!-- Video Feed Display -->
+                <div class="video-wrapper">
+                    <img id="videoStream" src="/video_feed" alt="Live AI Camera Feed">
+                    <div id="alertOverlay" class="alert-flash-overlay hidden">
+                        <div class="flash-content">
+                            <i data-lucide="alert-triangle"></i>
+                            <h3 id="alertOverlayTitle">DANGER DETECTED!</h3>
+                            <p id="alertOverlaySub">Immediate Attention Required</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feed Controls & Toggles Toolbar -->
+                <div class="toolbar">
+                    <div class="toggle-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggleBoxes" checked>
+                            <span class="slider"></span>
+                            <span class="label-text">Bounding Boxes</span>
+                        </label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggleSkeletons" checked>
+                            <span class="slider"></span>
+                            <span class="label-text">Pose Keypoints</span>
+                        </label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggleRoi" checked>
+                            <span class="slider"></span>
+                            <span class="label-text">Safe Crib Boundary</span>
+                        </label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggleSpills" checked>
+                            <span class="slider"></span>
+                            <span class="label-text">Spill Detection</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Video Source Selector Tabs -->
+                <div class="source-selector">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" data-tab="demo">🎬 Demo Streams</button>
+                        <button class="tab-btn" data-tab="upload">📁 Upload Video</button>
+                        <button class="tab-btn" data-tab="webcam">🎥 Webcam / Cam</button>
+                        <button class="tab-btn" data-tab="url">🌐 CCTV Stream URL</button>
+                    </div>
+
+                    <div class="tab-content">
+                        <!-- Demo Tab -->
+                        <div id="tab-demo" class="tab-pane active">
+                            <p class="hint-text">Select a pre-packaged scenario test video:</p>
+                            <div class="demo-buttons">
+                                <button class="btn btn-outline" onclick="setDemoSource('sample_data/cradle_demo.mp4')">
+                                    <i data-lucide="baby"></i> Scenario 1: Cradle Exit Danger
+                                </button>
+                                <button class="btn btn-outline" onclick="setDemoSource('sample_data/fall_demo.mp4')">
+                                    <i data-lucide="activity"></i> Scenario 2: Play Area Child Fall
+                                </button>
+                                <button class="btn btn-outline" onclick="setDemoSource('sample_data/hazard_demo.mp4')">
+                                    <i data-lucide="droplet"></i> Scenario 3: Liquid Spill & Hazards
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Upload Tab -->
+                        <div id="tab-upload" class="tab-pane">
+                            <form id="uploadForm" class="upload-dropzone">
+                                <i data-lucide="upload-cloud"></i>
+                                <p>Drag & drop video here or <strong>browse file</strong></p>
+                                <span class="file-spec">Supports MP4, AVI, MOV, MKV, WEBM</span>
+                                <input type="file" id="videoFileInput" accept="video/*" hidden>
+                            </form>
+                        </div>
+
+                        <!-- Webcam Tab -->
+                        <div id="tab-webcam" class="tab-pane">
+                            <div class="input-row">
+                                <label for="camIndex">Camera Device Index:</label>
+                                <input type="number" id="camIndex" value="0" min="0" max="10" class="input-dark">
+                                <button class="btn btn-primary" onclick="setWebcamSource()">
+                                    <i data-lucide="camera"></i> Start Camera Feed
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Stream URL Tab -->
+                        <div id="tab-url" class="tab-pane">
+                            <div class="input-row">
+                                <input type="text" id="streamUrlInput" placeholder="rtsp://192.168.1.100:554/stream or http://..." class="input-dark flex-grow">
+                                <button class="btn btn-primary" onclick="setUrlSource()">
+                                    <i data-lucide="play-circle"></i> Connect Stream
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Column: Analytics & Event Log -->
+            <section class="analytics-card">
+                <!-- Metrics Counter Cards -->
+                <div class="metrics-grid">
+                    <div class="metric-card glass-panel">
+                        <div class="metric-icon children"><i data-lucide="users"></i></div>
+                        <div class="metric-info">
+                            <span class="metric-val" id="valChildren">0</span>
+                            <span class="metric-label">Active Kids</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-panel">
+                        <div class="metric-icon falls"><i data-lucide="user-minus"></i></div>
+                        <div class="metric-info">
+                            <span class="metric-val pulse-text" id="valFalls">0</span>
+                            <span class="metric-label">Falls Detected</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-panel">
+                        <div class="metric-icon breaches"><i data-lucide="alert-octagon"></i></div>
+                        <div class="metric-info">
+                            <span class="metric-val" id="valBreaches">0</span>
+                            <span class="metric-label">Bed/Cradle Exit Risk</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-panel">
+                        <div class="metric-icon hazards"><i data-lucide="zap"></i></div>
+                        <div class="metric-info">
+                            <span class="metric-val" id="valHazards">0</span>
+                            <span class="metric-label">Hazard Alerts</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-Time Activity & Risk Chart -->
+                <div class="chart-card glass-panel">
+                    <div class="panel-header">
+                        <i data-lucide="line-chart"></i>
+                        <h3>Real-Time Activity & Risk Index</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="riskChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Real-Time Event Log Feed -->
+                <div class="events-card glass-panel">
+                    <div class="panel-header">
+                        <i data-lucide="list"></i>
+                        <h3>Live Safety Event & Alert Log</h3>
+                        <button class="btn btn-sm btn-ghost" onclick="clearEventLog()">Clear</button>
+                    </div>
+                    <div class="event-log-list" id="eventLogList">
+                        <div class="empty-log-msg">
+                            <i data-lucide="check-circle-2"></i>
+                            <p>No safety alerts recorded. Children are safe.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
