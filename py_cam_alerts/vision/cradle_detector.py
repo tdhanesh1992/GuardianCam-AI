@@ -24,12 +24,13 @@ class CradleDetector:
         if polygon_pts and len(polygon_pts) >= 3:
             self.roi_polygon = polygon_pts
 
-    def analyze_child(self, bbox, frame_w, frame_h, keypoints=None):
+    def analyze_child(self, bbox, frame_w, frame_h, keypoints=None, child_id=1):
         """
         Analyze child bounding box and keypoints relative to cradle/bed ROI.
         returns dict with:
            status (str): "SAFE_INSIDE" | "APPROACHING_EDGE" | "CLIMBING_DANGER" | "OUT_OF_BED"
            is_danger (bool)
+           new_breach (bool)
            distance_to_boundary (float)
            details (dict)
         """
@@ -71,9 +72,16 @@ class CradleDetector:
             is_danger = False
             alert_msg = "Toddler safe inside cradle"
 
+        if not hasattr(self, "danger_states"):
+            self.danger_states = {}
+        was_danger = self.danger_states.get(child_id, False)
+        new_breach = is_danger and not was_danger
+        self.danger_states[child_id] = is_danger
+
         return {
             "status": status,
             "is_danger": is_danger,
+            "new_breach": new_breach,
             "dist_to_boundary": round(dist, 1),
             "alert_msg": alert_msg,
             "roi_points": roi_pts.tolist()

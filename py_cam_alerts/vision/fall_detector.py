@@ -34,53 +34,68 @@ class FallDetector:
         torso_angle = 0.0
         head_hip_rel = 0.0
         pose_confidence = 0.5
+        head_y = y1  # Always safely initialized
 
         if keypoints is not None and len(keypoints) >= 17:
             # COCO Keypoint mapping:
-            # 0: nose, 1: L eye, 2: R eye, 3: L ear, 4: R ear
-            # 5: L shoulder, 6: R shoulder, 7: L elbow, 8: R elbow
-            # 9: L wrist, 10: R wrist, 11: L hip, 12: R hip
-            # 13: L knee, 14: R knee, 15: L ankle, 16: R ankle
-            
-            # Extract key joints
+            # 0: nose, 5: L shoulder, 6: R shoulder, 11: L hip, 12: R hip
             nose = keypoints[0][:2]
             l_sh = keypoints[5][:2]
             r_sh = keypoints[6][:2]
             l_hip = keypoints[11][:2]
             r_hip = keypoints[12][:2]
 
-            sh_center = (l_sh + r_sh) / 2.0 if (np.any(l_sh) and np.any(r_sh)) else l_sh
-            hip_center = (l_hip + r_hip) / 2.0 if (np.any(l_hip) and np.any(r_hip)) else l_hip
+            # Handle partial occlusion: if one side is missing ([0, 0]), use the other side
+            has_l_sh = bool(np.any(l_sh))
+            has_r_sh = bool(np.any(r_sh))
+            if has_l_sh and has_r_sh:
+                sh_center = (l_sh + r_sh) / 2.0
+            elif has_l_sh:
+                sh_center = l_sh
+            elif has_r_sh:
+                sh_center = r_sh
+            else:
+                sh_center = np.array([centroid_x, y1 + height * 0.25])
 
-            # Check if torso vector exists
-            if np.any(sh_center) and np.any(hip_center):
-                dx = sh_center[0] - hip_center[0]
-                dy = sh_center[1] - hip_center[1]  # positive Y is downwards in images
-                
-                # Torso angle relative to vertical axis (0 deg is upright, 90 deg is horizontal)
-                torso_angle = abs(math.degrees(math.atan2(dx, -dy)))
-                if torso_angle > 90:
-                    torso_angle = 180 - torso_angle
+            has_l_hip = bool(np.any(l_hip))
+            has_r_hip = bool(np.any(r_hip))
+            if has_l_hip and has_r_hip:
+                hip_center = (l_hip + r_hip) / 2.0
+            elif has_l_hip:
+                hip_center = l_hip
+            elif has_r_hip:
+                hip_center = r_hip
+            else:
+                hip_center = np.array([centroid_x, y1 + height * 0.65])
+
+            dx = sh_center[0] - hip_center[0]
+            dy = sh_center[1] - hip_center[1]  # positive Y is downwards in images
+            
+            # Torso angle relative to vertical axis (0 deg is upright, 90 deg is horizontal)
+            torso_angle = abs(math.degrees(math.atan2(dx, -dy)))
+            if torso_angle > 90:
+                torso_angle = 180 - torso_angle
 
             # Check head vs hip Y level
-            head_y = nose[1] if np.any(nose) else y1
-            head_hip_rel = hip_center[1] - head_y  # positive if head is above hips
+            if np.any(nose):
+                head_y = nose[1]
+            head_hip_rel = hip_center[1] - head_y
 
             # Pose horizontal condition
-            if torso_angle > 55.0 or aspect_ratio > 1.1 or head_hip_rel < height * 0.15:
+            if torso_angle > 50.0 or aspect_ratio > 1.1 or head_hip_rel < (height * 0.15):
                 is_lying = True
         else:
             # Fallback to Bounding Box ratio analysis
-            if aspect_ratio > 1.15:
+            if aspect_ratio > 1.1:
                 is_lying = True
-                torso_angle = 70.0
+                torso_angle = 75.0
 
         # Maintain track history for velocity calculation
         if person_id not in self.track_history:
             self.track_history[person_id] = []
 
         history = self.track_history[person_id]
-        history.append((now, centroid_y, head_y if keypoints is not None else y1, is_lying))
+        history.append((now, centroid_y, head_y, is_lying))
         if len(history) > self.history_len:
             history.pop(0)
 
@@ -102,24 +117,26 @@ class FallDetector:
         fall_score = 0.0
         if is_lying:
             fall_score += 0.5
-        if torso_angle > 60:
+        if torso_angle > 55:
             fall_score += 0.25
         if sudden_drop or velocity > (height * 1.5):
             fall_score += 0.35
-        if aspect_ratio > 1.25:
+        if aspect_ratio > 1.15:
             fall_score += 0.15
 
-        is_fall = fall_score >= 0.60
+        is_fall = fall_score >= 0.55
         
-        # Smooth alert output (hysteresis)
+        # Smooth alert output (hysteresis) and edge-triggered event detection
         if person_id not in self.alert_states:
             self.alert_states[person_id] = {"active": False, "since": 0}
 
         st = self.alert_states[person_id]
+        new_fall_event = False
         if is_fall:
             if not st["active"]:
                 st["active"] = True
                 st["since"] = now
+                new_fall_event = True
         else:
             # Clear fall state if upright for at least 1.5 seconds
             if st["active"] and (now - st["since"] > 1.5):
@@ -129,6 +146,7 @@ class FallDetector:
 
         return {
             "is_fall": st["active"],
+            "new_fall_event": new_fall_event,
             "fall_score": min(1.0, round(fall_score, 2)),
             "posture": posture_str,
             "aspect_ratio": round(aspect_ratio, 2),
