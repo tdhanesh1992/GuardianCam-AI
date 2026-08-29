@@ -108,7 +108,7 @@ py_cam_alerts/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/tdhanesh1992/py_cam_alerts.git
+git clone https://github.com/tdhanesh1992/GuardianCam-AI.git
 cd py_cam_alerts
 ```
 
