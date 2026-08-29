@@ -123,4 +123,17 @@ class HazardDetector:
                                 "bbox": obbox
                             })
 
-        return all_hazards, alerts, spill_mask
+        # Track new alerts vs already active alerts to prevent stat spam
+        if not hasattr(self, "active_alert_keys"):
+            self.active_alert_keys = set()
+
+        current_keys = set()
+        new_alert_count = 0
+        for a in alerts:
+            k = f"{a['hazard_type']}_{int(a['bbox'][0] // 40)}_{int(a['bbox'][1] // 40)}"
+            current_keys.add(k)
+            if k not in self.active_alert_keys:
+                new_alert_count += 1
+        self.active_alert_keys = current_keys
+
+        return all_hazards, alerts, spill_mask, new_alert_count

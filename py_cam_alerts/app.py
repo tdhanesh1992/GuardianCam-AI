@@ -53,7 +53,11 @@ class VideoStreamManager:
         if self.source_type == "webcam":
             try:
                 cam_idx = int(self.source_path) if str(self.source_path).isdigit() else 0
-                self.cap = cv2.VideoCapture(cam_idx, cv2.CAP_DSHOW)
+                import platform
+                if platform.system() == "Windows":
+                    self.cap = cv2.VideoCapture(cam_idx, cv2.CAP_DSHOW)
+                else:
+                    self.cap = cv2.VideoCapture(cam_idx)
             except Exception as e:
                 logger.error(f"Failed to open webcam: {e}")
                 self.cap = None
@@ -119,7 +123,7 @@ class OverlayToggleModel(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html")
 
 def generate_mjpeg():
     while stream_manager.is_running:
@@ -196,4 +200,16 @@ async def toggle_overlays(data: OverlayToggleModel):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import socket
+
+    port = int(os.environ.get("PORT", 8000))
+    def is_port_in_use(p):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('127.0.0.1', p)) == 0
+
+    if is_port_in_use(port) and "PORT" not in os.environ:
+        logger.warning(f"Port {port} is in use by another process. Switching to 8001.")
+        port = 8001
+
+    logger.info(f"Starting server on http://0.0.0.0:{port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
